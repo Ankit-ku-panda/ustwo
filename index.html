@@ -6,10 +6,15 @@
 <title>UsTwo Arcade | 3D puzzle games</title>
 <meta name="description" content="Pick a username and play riddles, word scramble, memory match and zip path puzzles in a 3D arcade. Make your own riddle levels too.">
 <meta name="theme-color" content="#0b0818">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="UsTwo">
 <meta property="og:title" content="UsTwo Arcade">
 <meta property="og:description" content="3D puzzle arcade: riddles, word scramble, memory match and zip path.">
 <meta property="og:type" content="website">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -23,5 +28,14 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="/script.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(error => {
+      console.error("Service worker registration failed:", error);
+    });
+  });
+}
+</script>
 </body>
 </html>

@@ -169,9 +169,8 @@ function home(){
  if(!S.name){
   app.innerHTML=`<h1>${split("UsTwo")} <span class="grad">${split("Arcade")}</span></h1>
   <p class="sub">Pick a name, choose a game, clear levels. Your progress stays on this device.</p>
-  <div class="panel"><input id="nm" maxlength="16" placeholder="Choose a username" autocomplete="off"><br><button class="btn" id="go">Start playing</button><div class="msg" id="m"></div></div>`;
-  const go=()=>{const v=$("#nm").value.trim();if(v.length<2){$("#m").textContent="Use at least 2 characters.";return}S.name=v;save();home()};
-  $("#go").onclick=go;$("#nm").onkeydown=e=>e.key==="Enter"&&go();return}
+  <form class="panel" id="name-form"><label for="nm">Your username</label><br><input id="nm" type="text" inputmode="text" maxlength="16" placeholder="Choose a username" autocomplete="nickname" autocapitalize="words" spellcheck="false" required><br><button class="btn" id="go" type="submit">Start playing</button><div class="msg" id="m" role="status"></div></form>`;
+  $("#name-form").onsubmit=e=>{e.preventDefault();const v=$("#nm").value.trim();if(v.length<2){$("#m").textContent="Use at least 2 characters.";$("#nm").focus();return}S.name=v;save();home()};return}
  app.innerHTML=top()+`<h1>${split("Hey "+S.name)}</h1><p class="sub">Choose a game category or play together.</p>
  <div class="panel"><h2>Play together</h2><button class="btn" id="create-room">Create room</button>
  <input id="join-code" placeholder="Enter your partner's room code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn g" id="join-room">Join room</button><div class="msg" id="room-error" role="alert"></div></div>
@@ -229,12 +228,14 @@ function play(c,i){
   const n=ZIP[i],k=n+1,tr=Math.random()<.5,fx=Math.random()<.5,fy=Math.random()<.5;
   const num={};const cell=t=>{const r=t/n|0;let cc=r%2?n-1-t%n:t%n,rr=r;if(fx)cc=n-1-cc;if(fy)rr=n-1-rr;return tr?cc*n+rr:rr*n+cc};
   for(let j=0;j<k;j++)num[cell(Math.round(j*(n*n-1)/(k-1)))]=j+1;
-  let path=[];
+  let path=[],pointerId=null,lastPointerCell=-1;
   const draw=()=>{document.querySelectorAll(".zc").forEach((b,x)=>b.classList.toggle("on",path.includes(x)))};
-  app.innerHTML=head+`<div class="panel"><p class="sub">Start at 1, reach every number in order, and fill every cell. Tap a cell on your line to step back.</p><div class="zip" style="grid-template-columns:repeat(${n},1fr)">${[...Array(n*n)].map((_,x)=>`<button class="zc" data-x="${x}">${num[x]||""}</button>`).join("")}</div><div class="msg" id="m"></div><button class="btn g" id="rs">Reset</button></div><div id="res"></div>`;
+  app.innerHTML=head+`<div class="panel"><p class="sub">Start at 1, reach every number in order, and fill every cell. Slide your finger or tap neighbouring cells. Tap your line to step back.</p><div class="zip" style="grid-template-columns:repeat(${n},1fr)">${[...Array(n*n)].map((_,x)=>`<button class="zc" data-x="${x}">${num[x]||""}</button>`).join("")}</div><div class="msg" id="m"></div><button class="btn g" id="rs">Reset</button></div><div id="res"></div>`;
   $("#rs").onclick=()=>{path=[];draw();$("#m").textContent=""};
-  document.querySelectorAll(".zc").forEach(b=>b.onclick=()=>{
-   const x=+b.dataset.x,m=$("#m"),at=path.indexOf(x);m.textContent="";
+  const moveTo=x=>{
+   const m=$("#m"),at=path.indexOf(x);
+   if(path[path.length-1]===x)return;
+   m.textContent="";
    if(at>=0){path=path.slice(0,at+1)}
    else if(!path.length){if(num[x]===1)path=[x];else m.textContent="Start on 1."}
    else{const l=path[path.length-1],near=Math.abs((l/n|0)-(x/n|0))+Math.abs(l%n-x%n)===1;
@@ -244,7 +245,23 @@ function play(c,i){
     else path.push(x)}
    draw();
    if(path.length===n*n&&num[path[path.length-1]]===k)winBox(c,i);
+  };
+  const cellFromPoint=(x,y)=>document.elementFromPoint(x,y)?.closest(".zc");
+  app.querySelectorAll(".zc").forEach(b=>b.addEventListener("click",()=>moveTo(+b.dataset.x)));
+  const zip=app.querySelector(".zip");
+  zip.addEventListener("pointerdown",e=>{
+   const cell=e.target.closest(".zc");if(!cell)return;
+   e.preventDefault();pointerId=e.pointerId;lastPointerCell=+cell.dataset.x;moveTo(lastPointerCell);
   });
+  zip.addEventListener("pointermove",e=>{
+   if(pointerId!==e.pointerId)return;
+   const cell=cellFromPoint(e.clientX,e.clientY);if(!cell)return;
+   const x=+cell.dataset.x;if(x===lastPointerCell)return;
+   lastPointerCell=x;moveTo(x);
+  });
+  const endPointer=e=>{if(pointerId===e.pointerId){pointerId=null;lastPointerCell=-1}};
+  zip.addEventListener("pointerup",endPointer);
+  zip.addEventListener("pointercancel",endPointer);
  }
 }
 

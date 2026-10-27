@@ -10,6 +10,11 @@ Static site: index.html, style.css, script.js. No build step.
 
 Two-player rooms use PeerJS/WebRTC and need an internet connection. Game progress is saved separately in each player's browser.
 
+## Install on mobile
+- Android (Chrome): open the site menu and choose **Install app** or **Add to Home screen**.
+- iPhone/iPad (Safari): tap **Share**, then **Add to Home Screen**.
+- The site must be opened over HTTPS for installation and offline caching to work.
+
 ## Deploy on Vercel
 1. Push this folder to a GitHub repo.
 2. In Vercel, choose Add New > Project and import the repo.
