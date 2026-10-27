@@ -2,6 +2,14 @@
 
 Static site: index.html, style.css, script.js. No build step.
 
+## Play together
+1. Open the deployed site on both devices and choose a username.
+2. One player selects **Create room** and shares the room code.
+3. The other player enters the code with **Join room**.
+4. The host chooses a game. Each player solves the same level on their own device; the room advances only after both finish.
+
+Two-player rooms use PeerJS/WebRTC and need an internet connection. Game progress is saved separately in each player's browser.
+
 ## Deploy on Vercel
 1. Push this folder to a GitHub repo.
 2. In Vercel, choose Add New > Project and import the repo.

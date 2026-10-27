@@ -4,6 +4,7 @@ let S={name:"",done:{},custom:[]};
 try{Object.assign(S,JSON.parse(localStorage.getItem("ustwo")||"{}"))}catch(e){}
 const save=()=>{try{localStorage.setItem("ustwo",JSON.stringify(S))}catch(e){}};
 const $=s=>document.querySelector(s), app=$("#app");
+let room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[]};
 
 // ---------- levels (edit these to add more) ----------
 const RIDDLES=[
@@ -32,7 +33,136 @@ const stars=()=>Object.keys(S.done).length;
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const isDone=(c,i)=>!!S.done[c+":"+i];
 const unlocked=(c,i)=>i===0||isDone(c,i-1);
-function top(back){return `<div class="bar"><div>${back?`<button class="btn g" data-go="${back}">← Back</button>`:""}</div><div><span class="pill">👤 ${esc(S.name)}</span> <span class="pill" id="star-count">⭐ ${stars()}</span></div></div>`}
+function top(back){return `<div class="bar"><div>${room.active?`<button class="btn g" data-room-leave>Leave room</button>`:back?`<button class="btn g" data-go="${back}">← Back</button>`:""}</div><div><span class="pill">👤 ${esc(S.name)}</span> <span class="pill" id="star-count">⭐ ${stars()}</span></div></div>`}
+function roomPlayerStatus(){return room.active?`<p class="sub" id="room-progress">Playing with ${esc(room.partnerName||"your partner")} · both players must solve this level to continue.</p>`:""}
+
+function roomStatus(text){const el=$("#room-status");if(el)el.textContent=text}
+function roomError(text){const el=$("#room-error");if(el)el.textContent=text}
+function closeRoom(){
+ if(room.conn)room.conn.close();
+ if(room.peer)room.peer.destroy();
+ room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[]};
+ home();
+}
+function roomLobby(){
+ app.innerHTML=top()+`<h2>Two-player room</h2><div class="panel">
+  <p>${room.role==="host"?"Share this room code with your partner:":"Connecting to room:"} <strong>${esc(room.code)}</strong></p>
+  ${room.role==="host"&&room.code?`<button class="btn g" id="copy-room-code">Copy code</button>`:""}
+  <p id="room-status" class="msg">${room.role==="host"?"Waiting for your partner to join…":"Connecting…"}</p>
+  ${room.role==="host"?`<div class="grid">${CATS.map(c=>`<button class="card" data-room-cat="${c.id}" ${c.id==="mine"&&!S.custom.length?"disabled":""}><span class="ic">${c.ic}</span><b>${c.t}</b><small>${c.id==="mine"&&!S.custom.length?"Add your own riddles first":c.d+(c.n?" · "+c.n+" levels":"")}</small></button>`).join("")}</div>`:""}
+  <div id="room-error" class="msg" role="alert"></div><button class="btn g" id="leave-room">Leave room</button>
+ </div>`;
+ $("#leave-room").onclick=closeRoom;
+ const copy=$("#copy-room-code");
+ if(copy)copy.onclick=async()=>{try{await navigator.clipboard.writeText(room.code);roomStatus("Room code copied. Waiting for your partner…")}catch(error){roomStatus("Copy failed. Select and copy the room code above.")}};
+}
+function roomFailure(message){
+ const wasActive=room.active;
+ room.active=false;
+ roomError(message);
+ if(room.peer)room.peer.destroy();
+ room.peer=null;room.conn=null;
+ if(wasActive){home();roomError(message)}
+}
+function startRoomHost(){
+ if(typeof Peer==="undefined"){roomError("Room connection is unavailable. Check your internet connection and reload.");return}
+ room.role="host";room.partnerName="";
+ roomLobby();
+ try{
+  room.peer=new Peer();
+  room.peer.on("open",id=>{room.code=id;roomLobby()});
+  room.peer.on("connection",conn=>{
+   if(room.conn){conn.close();return}
+   room.conn=conn;
+   conn.on("open",()=>{
+    roomStatus("Partner connected. Choose a game to begin.");
+   });
+   conn.on("data",onRoomMessage);
+   conn.on("close",()=>{room.partnerName="";room.partnerDone=false;if(room.active){room.active=false;if(room.peer)room.peer.destroy();room.peer=null;room.conn=null;home();roomError("Your partner disconnected. Create a new room to play together.")}else{room.conn=null;roomStatus("Partner disconnected. Share the same room code and have them join again.")}});
+   conn.on("error",()=>roomFailure("The room connection was interrupted. Please create a new room."));
+  });
+  room.peer.on("error",err=>roomFailure(err.type==="unavailable-id"?"That room code is already in use. Create a new room.":"Could not connect to the room service. Check your internet connection and try again."));
+ }catch(error){roomFailure("Could not create a room. Check your internet connection and try again.");}
+}
+function startRoomGuest(code){
+ if(typeof Peer==="undefined"){roomError("Room connection is unavailable. Check your internet connection and reload.");return}
+ room.role="guest";room.code=code;roomLobby();
+ try{
+  room.peer=new Peer();
+  room.peer.on("open",()=>{room.conn=room.peer.connect(code,{reliable:true});bindGuestConnection()});
+  room.peer.on("error",err=>roomFailure(err.type==="peer-unavailable"?"Room not found. Check the code and try again.":"Could not connect to the room service. Check your internet connection and try again."));
+ }catch(error){roomFailure("Could not join the room. Check your internet connection and try again.");}
+}
+function bindGuestConnection(){
+ const conn=room.conn;
+ conn.on("open",()=>{roomStatus("Connected. Waiting for the host to choose a game…");conn.send({type:"hello",name:S.name})});
+ conn.on("data",onRoomMessage);
+ conn.on("close",()=>{if(room.active){room.active=false;if(room.peer)room.peer.destroy();room.peer=null;room.conn=null;home();roomError("The host disconnected. Join a new room to play together.")}else roomStatus("Host disconnected. Leave and join another room.")});
+ conn.on("error",error=>roomFailure(error.type==="peer-unavailable"?"Room not found. Check the code and try again.":"The room connection was interrupted. Please rejoin."));
+}
+function beginRoomGame(category){
+ if(!room.conn||!room.conn.open){roomError("Wait until your partner joins before starting a game.");return}
+ room.category=category;room.level=0;room.custom=category==="mine"?S.custom.map(r=>[...r]):[];
+ room.active=true;room.selfDone=false;room.partnerDone=false;
+ room.conn.send({type:"start",category,level:0,custom:room.custom});
+ play(category,0);
+}
+function onRoomMessage(message){
+ if(!message||typeof message!=="object")return;
+ if(message.type==="hello"&&room.role==="host"){
+  room.partnerName=typeof message.name==="string"?message.name.slice(0,16):"Partner";
+  room.conn.send({type:"welcome",name:S.name});
+  roomStatus(`${room.partnerName} connected. Choose a game to begin.`);
+  if(room.active)room.conn.send({type:"start",category:room.category,level:room.level,custom:room.custom});
+ }else if(message.type==="welcome"&&room.role==="guest"){
+  room.partnerName=typeof message.name==="string"?message.name.slice(0,16):"Host";
+  if(!room.active)roomStatus(`Connected to ${room.partnerName}. Waiting for the host to choose a game…`);
+ }else if(message.type==="start"&&room.role==="guest"&&typeof message.category==="string"&&Number.isInteger(message.level)){
+  room.category=message.category;room.level=message.level;room.custom=Array.isArray(message.custom)?message.custom:[];
+  room.active=true;room.selfDone=false;room.partnerDone=false;
+  play(room.category,room.level);
+ }else if(message.type==="complete"&&room.role==="host"&&room.active&&message.category===room.category&&message.level===room.level){
+  room.partnerDone=true;
+  const progress=$("#room-progress");
+  if(progress)progress.textContent=room.selfDone?"Both players solved it. Moving to the next level…":"Your partner solved it. Now solve this level to continue.";
+  checkRoomCompletion();
+ }else if(message.type==="advance"&&room.role==="guest"&&room.active&&message.category===room.category&&message.level===room.level+1){
+  markDone(room.category,room.level);
+  room.level=message.level;room.selfDone=false;room.partnerDone=false;
+  play(room.category,room.level);
+ }else if(message.type==="finished"&&room.role==="guest"&&room.active&&message.category===room.category&&message.level===room.level){
+  markDone(room.category,room.level);room.active=false;renderRoomFinished();
+ }
+}
+function markDone(category,level){
+ S.done[category+":"+level]=1;save();
+}
+function completeRoomLevel(category,level){
+ if(room.selfDone)return;
+ room.selfDone=true;
+ if(room.role==="guest"&&room.conn&&room.conn.open)room.conn.send({type:"complete",category,level});
+ if(room.role==="host")checkRoomCompletion();
+ else $("#res").innerHTML=`<div class="panel"><h2>You solved it!</h2><p class="msg">Waiting for ${esc(room.partnerName||"your partner")} to finish this level…</p></div>`;
+ const progress=$("#room-progress");
+ if(progress)progress.textContent=room.role==="host"?"You solved it. Waiting for your partner…":"You solved it. Waiting for your partner…";
+}
+function checkRoomCompletion(){
+ if(room.role!=="host"||!room.active||!room.selfDone||!room.partnerDone)return;
+ const category=room.category,level=room.level,total=category==="mine"?room.custom.length:CATS.find(c=>c.id===category).n;
+ markDone(category,level);$("#star-count").textContent="⭐ "+stars();
+ if(level+1<total){
+  room.level=level+1;room.selfDone=false;room.partnerDone=false;
+  room.conn.send({type:"advance",category,level:room.level});
+  play(category,room.level);
+ }else{
+  room.conn.send({type:"finished",category,level});
+  room.active=false;renderRoomFinished();
+ }
+}
+function renderRoomFinished(){
+ app.innerHTML=top()+`<div class="panel win"><h2>Both players cleared the game! ⭐</h2><p>Your progress is saved on this device.</p><button class="btn g" id="leave-room">Leave room</button></div>`;
+ $("#leave-room").onclick=closeRoom;
+}
 
 // ---------- screens ----------
 function home(){
@@ -42,10 +172,16 @@ function home(){
   <div class="panel"><input id="nm" maxlength="16" placeholder="Choose a username" autocomplete="off"><br><button class="btn" id="go">Start playing</button><div class="msg" id="m"></div></div>`;
   const go=()=>{const v=$("#nm").value.trim();if(v.length<2){$("#m").textContent="Use at least 2 characters.";return}S.name=v;save();home()};
   $("#go").onclick=go;$("#nm").onkeydown=e=>e.key==="Enter"&&go();return}
- app.innerHTML=top()+`<h1>${split("Hey "+S.name)}</h1><p class="sub">Choose a game category.</p>
+ app.innerHTML=top()+`<h1>${split("Hey "+S.name)}</h1><p class="sub">Choose a game category or play together.</p>
+ <div class="panel"><h2>Play together</h2><button class="btn" id="create-room">Create room</button>
+ <input id="join-code" placeholder="Enter your partner's room code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn g" id="join-room">Join room</button><div class="msg" id="room-error" role="alert"></div></div>
+ <h2>Play solo</h2>
  <div class="grid">${CATS.map(c=>`<button class="card" data-cat="${c.id}"><span class="ic">${c.ic}</span><b>${c.t}</b><small>${c.d}${c.n?" · "+c.n+" levels":""}</small></button>`).join("")}</div>
  <p><button class="btn g" id="rn">Change username</button></p>`;
  $("#rn").onclick=()=>{S.name="";save();home()};
+ $("#create-room").onclick=startRoomHost;
+ $("#join-room").onclick=()=>{const code=$("#join-code").value.trim();if(!code){roomError("Enter the room code first.");return}startRoomGuest(code)};
+ $("#join-code").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();$("#join-room").click()}};
 }
 function levels(c){
  const cat=CATS.find(x=>x.id===c);
@@ -59,25 +195,26 @@ function mine(){
  $("#add").onclick=()=>{const q=$("#q").value.trim(),a=$("#a").value.trim(),h=$("#h").value.trim();if(!q||!a){$("#m").textContent="Add a question and an answer.";return}S.custom.push([q,a.toLowerCase(),h||"No hint for this one."]);save();mine()};
 }
 function winBox(c,i){
+ if(room.active&&room.category===c&&room.level===i){completeRoomLevel(c,i);return}
  S.done[c+":"+i]=1;save();
  $("#star-count").textContent="⭐ "+stars();
  const total=c==="mine"?S.custom.length:CATS.find(x=>x.id===c).n;
  $("#res").innerHTML=`<div class="panel win"><h2>Level ${i+1} cleared ⭐</h2>${i+1<total?`<button class="btn" data-lv="${c}:${i+1}">Next level</button>`:""}<button class="btn g" data-go="cat:${c}">All levels</button></div>`;
 }
 function play(c,i){
- i=+i;const back="cat:"+c;
- const head=top(back)+`<h2>Level ${i+1}</h2>`;
+ i=+i;const back=room.active?"":"cat:"+c;
+ const head=top(back)+`<h2>Level ${i+1}</h2>`+roomPlayerStatus();
  if(c==="riddle"||c==="mine"){
-  const r=c==="mine"?S.custom[i]:RIDDLES[i];
-  app.innerHTML=head+`<div class="panel"><p style="font-size:1.2rem">${esc(r[0])}</p><input id="in" placeholder="Your answer" autocomplete="off"><br><button class="btn" id="ck">Check</button><button class="btn g" id="ht">Hint</button><div class="msg" id="m"></div></div><div id="res"></div>`;
-  const ck=()=>{if($("#in").value.trim().toLowerCase()===r[1].toLowerCase()){$("#m").textContent="Correct!";winBox(c,i)}else $("#m").textContent="Not yet. Try again."};
-  $("#ck").onclick=ck;$("#in").onkeydown=e=>e.key==="Enter"&&ck();$("#ht").onclick=()=>$("#m").textContent="Hint: "+r[2];
+  const r=c==="mine"?(room.active?room.custom[i]:S.custom[i]):RIDDLES[i];
+  app.innerHTML=head+`<div class="panel"><p style="font-size:1.2rem">${esc(r[0])}</p><form id="answer-form"><input id="in" placeholder="Your answer" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><br><button class="btn" id="ck" type="submit">Check</button><button class="btn g" id="ht" type="button">Hint</button></form><div class="msg" id="m"></div></div><div id="res"></div>`;
+  const ck=e=>{e.preventDefault();if($("#in").value.trim().toLowerCase()===r[1].trim().toLowerCase()){$("#m").textContent="Correct!";winBox(c,i)}else $("#m").textContent="Not yet. Try again."};
+  $("#answer-form").onsubmit=ck;$("#ht").onclick=()=>$("#m").textContent="Hint: "+r[2];
  }
  if(c==="scr"){
   const w=WORDS[i];let s;do{s=shuffle(w).join("")}while(s===w);
-  app.innerHTML=head+`<div class="panel"><div class="scr">${s.toUpperCase()}</div><input id="in" placeholder="Unscrambled word" autocomplete="off"><br><button class="btn" id="ck">Check</button><button class="btn g" id="ht">Reveal a letter</button><div class="msg" id="m"></div></div><div id="res"></div>`;
-  const ck=()=>{if($("#in").value.trim().toLowerCase()===w){$("#m").textContent="Correct!";winBox(c,i)}else $("#m").textContent="Not quite."};
-  $("#ck").onclick=ck;$("#in").onkeydown=e=>e.key==="Enter"&&ck();$("#ht").onclick=()=>$("#m").textContent="Starts with "+w[0].toUpperCase()+", ends with "+w.slice(-1).toUpperCase();
+  app.innerHTML=head+`<div class="panel"><div class="scr">${s.toUpperCase()}</div><form id="answer-form"><input id="in" placeholder="Unscrambled word" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"><br><button class="btn" id="ck" type="submit">Check</button><button class="btn g" id="ht" type="button">Reveal a letter</button></form><div class="msg" id="m"></div></div><div id="res"></div>`;
+  const ck=e=>{e.preventDefault();if($("#in").value.trim().toLowerCase()===w){$("#m").textContent="Correct!";winBox(c,i)}else $("#m").textContent="Not quite."};
+  $("#answer-form").onsubmit=ck;$("#ht").onclick=()=>$("#m").textContent="Starts with "+w[0].toUpperCase()+", ends with "+w.slice(-1).toUpperCase();
  }
  if(c==="mem"){
   const deck=shuffle([...MEM[i],...MEM[i]]);let open=[],lock=false,found=0,moves=0;
@@ -113,8 +250,10 @@ function play(c,i){
 
 // ---------- events ----------
 document.addEventListener("click",e=>{
- const t=e.target.closest("[data-cat],[data-lv],[data-go]");if(!t||t.disabled)return;
- if(t.dataset.cat)levels(t.dataset.cat);
+ const t=e.target.closest("[data-room-leave],[data-room-cat],[data-cat],[data-lv],[data-go]");if(!t||t.disabled)return;
+ if(t.hasAttribute("data-room-leave"))closeRoom();
+ else if(t.dataset.roomCat)beginRoomGame(t.dataset.roomCat);
+ else if(t.dataset.cat)levels(t.dataset.cat);
  else if(t.dataset.lv){const[c,i]=t.dataset.lv.split(":");play(c,i)}
  else{const g=t.dataset.go;g==="home"?home():levels(g.split(":")[1])}
  window.scrollTo(0,0);
