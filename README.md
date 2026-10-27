@@ -4,11 +4,11 @@ Static site: index.html, style.css, script.js. No build step.
 
 ## Play together
 1. Open the deployed site on both devices and choose a username.
-2. One player selects **Create room** and shares the room code.
+2. One player selects **Create room** and shares the room code or invite link.
 3. The other player enters the code with **Join room**.
 4. The host chooses a game. Each player solves the same level on their own device; the room advances only after both finish.
 
-Two-player rooms use PeerJS/WebRTC and need an internet connection. Game progress is saved separately in each player's browser.
+Two-player rooms use PeerJS/WebRTC and need an internet connection. The host must keep the room page open; room codes expire when the host closes or reloads it. Game progress is saved separately in each player's browser.
 
 ## Install on mobile
 - Android (Chrome): open the site menu and choose **Install app** or **Add to Home screen**.

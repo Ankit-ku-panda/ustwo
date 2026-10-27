@@ -4,7 +4,7 @@ let S={name:"",done:{},custom:[]};
 try{Object.assign(S,JSON.parse(localStorage.getItem("ustwo")||"{}"))}catch(e){}
 const save=()=>{try{localStorage.setItem("ustwo",JSON.stringify(S))}catch(e){}};
 const $=s=>document.querySelector(s), app=$("#app");
-let room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[]};
+let room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[],joinAttempts:0,retryTimer:null,joinTimer:null};
 
 // ---------- levels (edit these to add more) ----------
 const RIDDLES=[
@@ -38,31 +38,55 @@ function roomPlayerStatus(){return room.active?`<p class="sub" id="room-progress
 
 function roomStatus(text){const el=$("#room-status");if(el)el.textContent=text}
 function roomError(text){const el=$("#room-error");if(el)el.textContent=text}
+function roomInviteUrl(code){
+ const url=new URL(location.href);
+ url.search="";url.hash="";url.searchParams.set("join",code);
+ return url.toString();
+}
 function closeRoom(){
+ clearTimeout(room.retryTimer);clearTimeout(room.joinTimer);
  if(room.conn)room.conn.close();
  if(room.peer)room.peer.destroy();
- room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[]};
+ room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[],joinAttempts:0,retryTimer:null,joinTimer:null};
  home();
 }
 function roomLobby(){
  app.innerHTML=top()+`<h2>Two-player room</h2><div class="panel">
-  <p>${room.role==="host"?"Share this room code with your partner:":"Connecting to room:"} <strong>${esc(room.code)}</strong></p>
-  ${room.role==="host"&&room.code?`<button class="btn g" id="copy-room-code">Copy code</button>`:""}
-  <p id="room-status" class="msg">${room.role==="host"?"Waiting for your partner to join…":"Connecting…"}</p>
+  <p>${room.role==="host"?"Share this room code with your partner. Keep this page open while they join:":"Connecting to room:"} <strong>${esc(room.code)}</strong></p>
+  ${room.role==="host"&&room.code?`<button class="btn" id="share-room">Share invite</button><button class="btn g" id="copy-room-code">Copy code</button>`:""}
+  <p id="room-status" class="msg">${room.role==="host"?"Waiting for your partner to join. Keep this page open while they connect.":"Connecting…"}</p>
   ${room.role==="host"?`<div class="grid">${CATS.map(c=>`<button class="card" data-room-cat="${c.id}" ${c.id==="mine"&&!S.custom.length?"disabled":""}><span class="ic">${c.ic}</span><b>${c.t}</b><small>${c.id==="mine"&&!S.custom.length?"Add your own riddles first":c.d+(c.n?" · "+c.n+" levels":"")}</small></button>`).join("")}</div>`:""}
+  ${room.role==="guest"?`<label for="room-code-input">Room code</label><br><input id="room-code-input" value="${esc(room.code)}" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn" id="retry-join">Join room</button>`:""}
   <div id="room-error" class="msg" role="alert"></div><button class="btn g" id="leave-room">Leave room</button>
  </div>`;
  $("#leave-room").onclick=closeRoom;
+ const retry=$("#retry-join");
+ if(retry){
+  retry.onclick=()=>startRoomGuest($("#room-code-input").value);
+  $("#room-code-input").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();retry.click()}};
+ }
  const copy=$("#copy-room-code");
  if(copy)copy.onclick=async()=>{try{await navigator.clipboard.writeText(room.code);roomStatus("Room code copied. Waiting for your partner…")}catch(error){roomStatus("Copy failed. Select and copy the room code above.")}};
+ const share=$("#share-room");
+ if(share)share.onclick=async()=>{
+  const url=roomInviteUrl(room.code);
+  try{
+   if(navigator.share)await navigator.share({title:"Join my UsTwo Arcade room",text:"Open this invite to join my game:",url});
+   else{await navigator.clipboard.writeText(url);roomStatus("Invite link copied. Waiting for your partner…");return}
+   roomStatus("Invite shared. Keep this page open while your partner joins.");
+  }catch(error){if(error.name!=="AbortError")roomStatus("Could not share the invite. Copy the room code instead.")}
+ };
 }
 function roomFailure(message){
+ clearTimeout(room.retryTimer);clearTimeout(room.joinTimer);
  const wasActive=room.active;
  room.active=false;
- roomError(message);
+ room.joinAttempts++;
  if(room.peer)room.peer.destroy();
  room.peer=null;room.conn=null;
  if(wasActive){home();roomError(message)}
+ else if(room.role==="guest"){roomLobby();roomError(message)}
+ else roomError(message);
 }
 function startRoomHost(){
  if(typeof Peer==="undefined"){roomError("Room connection is unavailable. Check your internet connection and reload.");return}
@@ -85,20 +109,55 @@ function startRoomHost(){
  }catch(error){roomFailure("Could not create a room. Check your internet connection and try again.");}
 }
 function startRoomGuest(code){
+ code=String(code||"").trim().replace(/\s+/g,"");
+ if(!code){roomError("Enter the room code first.");return}
  if(typeof Peer==="undefined"){roomError("Room connection is unavailable. Check your internet connection and reload.");return}
- room.role="guest";room.code=code;roomLobby();
+ clearTimeout(room.retryTimer);clearTimeout(room.joinTimer);
+ room.joinAttempts++;
+ if(room.conn)room.conn.close();
+ if(room.peer)room.peer.destroy();
+ room.role="guest";room.code=code;room.partnerName="";room.conn=null;room.peer=null;room.joinAttempts=0;roomLobby();
  try{
   room.peer=new Peer();
-  room.peer.on("open",()=>{room.conn=room.peer.connect(code,{reliable:true});bindGuestConnection()});
-  room.peer.on("error",err=>roomFailure(err.type==="peer-unavailable"?"Room not found. Check the code and try again.":"Could not connect to the room service. Check your internet connection and try again."));
+  room.peer.on("open",()=>connectToRoom(code));
+  room.peer.on("error",err=>{
+   if(err.type==="peer-unavailable")scheduleGuestRetry();
+   else roomFailure("Could not connect to the room service. Check your internet connection and try again.");
+  });
  }catch(error){roomFailure("Could not join the room. Check your internet connection and try again.");}
 }
-function bindGuestConnection(){
+function connectToRoom(code){
+ if(room.role!=="guest"||!room.peer||room.active)return;
+ clearTimeout(room.joinTimer);
+ room.joinAttempts++;
+ roomStatus(room.joinAttempts===1?"Connecting…":`Retrying connection (${room.joinAttempts}/3)…`);
+ try{
+  room.conn=room.peer.connect(code,{reliable:true});
+  bindGuestConnection(room.joinAttempts);
+  room.joinTimer=setTimeout(()=>scheduleGuestRetry(),10000);
+ }catch(error){scheduleGuestRetry()}
+}
+function scheduleGuestRetry(){
+ if(room.role!=="guest"||room.active||room.retryTimer)return;
+ clearTimeout(room.joinTimer);
+ if(room.conn){room.conn.removeAllListeners();room.conn.close();room.conn=null}
+ if(room.joinAttempts>=3){
+  roomFailure("Room not found or host is offline. Check the code and ask the host to keep the room open, then try again.");
+  return;
+ }
+ roomStatus(`Room not found yet. Retrying (${room.joinAttempts+1}/3)…`);
+ room.retryTimer=setTimeout(()=>{room.retryTimer=null;connectToRoom(room.code)},1200);
+}
+function bindGuestConnection(attempt){
  const conn=room.conn;
- conn.on("open",()=>{roomStatus("Connected. Waiting for the host to choose a game…");conn.send({type:"hello",name:S.name})});
+ conn.on("open",()=>{
+  if(attempt!==room.joinAttempts)return;
+  clearTimeout(room.joinTimer);clearTimeout(room.retryTimer);
+  roomStatus("Connected. Waiting for the host to choose a game…");conn.send({type:"hello",name:S.name});
+ });
  conn.on("data",onRoomMessage);
- conn.on("close",()=>{if(room.active){room.active=false;if(room.peer)room.peer.destroy();room.peer=null;room.conn=null;home();roomError("The host disconnected. Join a new room to play together.")}else roomStatus("Host disconnected. Leave and join another room.")});
- conn.on("error",error=>roomFailure(error.type==="peer-unavailable"?"Room not found. Check the code and try again.":"The room connection was interrupted. Please rejoin."));
+ conn.on("close",()=>{if(attempt!==room.joinAttempts)return;if(room.active){room.active=false;if(room.peer)room.peer.destroy();room.peer=null;room.conn=null;home();roomError("The host disconnected. Ask them to create a new room and share its current code.")}else if(!conn.open)scheduleGuestRetry();else roomStatus("Host disconnected. Check the room code and try again.")});
+ conn.on("error",error=>{if(attempt!==room.joinAttempts)return;if(error.type==="peer-unavailable")scheduleGuestRetry();else roomFailure("The room connection was interrupted. Please try joining again.")});
 }
 function beginRoomGame(category){
  if(!room.conn||!room.conn.open){roomError("Wait until your partner joins before starting a game.");return}
@@ -173,7 +232,7 @@ function home(){
   $("#name-form").onsubmit=e=>{e.preventDefault();const v=$("#nm").value.trim();if(v.length<2){$("#m").textContent="Use at least 2 characters.";$("#nm").focus();return}S.name=v;save();home()};return}
  app.innerHTML=top()+`<h1>${split("Hey "+S.name)}</h1><p class="sub">Choose a game category or play together.</p>
  <div class="panel"><h2>Play together</h2><button class="btn" id="create-room">Create room</button>
- <input id="join-code" placeholder="Enter your partner's room code" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn g" id="join-room">Join room</button><div class="msg" id="room-error" role="alert"></div></div>
+ <input id="join-code" value="${esc(new URL(location.href).searchParams.get("join")||"")}" placeholder="Enter your partner's room code" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="join"><button class="btn g" id="join-room">Join room</button><div class="msg" id="room-error" role="alert"></div></div>
  <h2>Play solo</h2>
  <div class="grid">${CATS.map(c=>`<button class="card" data-cat="${c.id}"><span class="ic">${c.ic}</span><b>${c.t}</b><small>${c.d}${c.n?" · "+c.n+" levels":""}</small></button>`).join("")}</div>
  <p><button class="btn g" id="rn">Change username</button></p>`;
