@@ -1,3 +1,4 @@
+(function(){
 // ---------- state ----------
 let S={name:"",done:{},custom:[]};
 try{Object.assign(S,JSON.parse(localStorage.getItem("ustwo")||"{}"))}catch(e){}
@@ -31,7 +32,7 @@ const stars=()=>Object.keys(S.done).length;
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const isDone=(c,i)=>!!S.done[c+":"+i];
 const unlocked=(c,i)=>i===0||isDone(c,i-1);
-function top(back){return `<div class="bar"><div>${back?`<button class="btn g" data-go="${back}">← Back</button>`:""}</div><div><span class="pill">👤 ${esc(S.name)}</span> <span class="pill">⭐ ${stars()}</span></div></div>`}
+function top(back){return `<div class="bar"><div>${back?`<button class="btn g" data-go="${back}">← Back</button>`:""}</div><div><span class="pill">👤 ${esc(S.name)}</span> <span class="pill" id="star-count">⭐ ${stars()}</span></div></div>`}
 
 // ---------- screens ----------
 function home(){
@@ -59,6 +60,7 @@ function mine(){
 }
 function winBox(c,i){
  S.done[c+":"+i]=1;save();
+ $("#star-count").textContent="⭐ "+stars();
  const total=c==="mine"?S.custom.length:CATS.find(x=>x.id===c).n;
  $("#res").innerHTML=`<div class="panel win"><h2>Level ${i+1} cleared ⭐</h2>${i+1<total?`<button class="btn" data-lv="${c}:${i+1}">Next level</button>`:""}<button class="btn g" data-go="cat:${c}">All levels</button></div>`;
 }
@@ -141,3 +143,4 @@ document.addEventListener("mouseout",e=>{const c=e.target.closest&&e.target.clos
  }catch(e){}
 })();
 home();
+})();
