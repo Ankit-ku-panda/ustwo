@@ -1,34 +1,26 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>UsTwo – puzzles for two</title>
-<meta name="theme-color" content="#1b1226">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-</head><body>
-<section id="lobby" class="card">
-  <h1>Us<span>Two</span></h1>
-  <p class="sub">Riddles, Zip paths and word crosses. Every step is solved by both of you before you move on.</p>
-  <input id="nm" placeholder="Your name" maxlength="14" autocomplete="off">
-  <button id="mk">Create a room</button>
-  <p class="or">or join your partner's room</p>
-  <div class="row"><input id="cd" placeholder="Room code" maxlength="5" autocomplete="off" autocapitalize="characters"><button id="jn" class="ghost">Join</button></div>
-  <p id="ls" class="msg"></p>
-  <button id="sh" class="ghost" hidden>Share invite link</button>
-  <button id="in" class="ghost" hidden>Install app</button>
-</section>
-<main id="game" hidden>
-  <header><b id="lt"></b><div class="bar"><i id="pb"></i></div><span id="rc"></span></header>
-  <div id="boards">
-    <section class="panel" id="p1"><h2><span id="n1"></span><em id="s1"></em></h2><div class="body" id="b1"></div></section>
-    <section class="panel" id="p2"><h2><span id="n2"></span><em id="s2"></em></h2><div class="body" id="b2"></div></section>
-  </div>
-</main>
-<div id="end" class="card" hidden><h1>You did it</h1><p class="sub">Every level, solved together.</p><button onclick="location.href=location.pathname">Play again</button></div>
-<div id="toast"></div>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="app.js"></script>
-</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UsTwo Arcade | 3D puzzle games</title>
+<meta name="description" content="Pick a username and play riddles, word scramble, memory match and zip path puzzles in a 3D arcade. Make your own riddle levels too.">
+<meta name="theme-color" content="#0b0818">
+<meta property="og:title" content="UsTwo Arcade">
+<meta property="og:description" content="3D puzzle arcade: riddles, word scramble, memory match and zip path.">
+<meta property="og:type" content="website">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<canvas id="bg" aria-hidden="true"></canvas>
+<header class="site-head">
+  <a class="logo" href="/">UsTwo Arcade</a>
+  <nav><a href="#app">Games</a><a href="https://github.com/" rel="noopener">GitHub</a></nav>
+</header>
+<main id="app"><noscript>This site needs JavaScript to run the games.</noscript></main>
+<footer class="site-foot">Progress is saved in your browser on this device. Built with HTML, CSS, JavaScript and three.js.</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="/script.js"></script>
+</body>
+</html>
