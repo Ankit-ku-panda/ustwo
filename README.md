@@ -10,6 +10,11 @@ Static site: index.html, style.css, script.js, plus the standalone Duck Dash, Ch
 
 Two-player rooms use four-digit codes and PeerJS/WebRTC, so they need an internet connection. The host must keep the room page open; room codes expire when the host closes or reloads it. Game progress is saved separately in each player's browser. All seven built-in games have 50 levels; difficulty increases as players advance, and the three arcade games clear a level when the score target is reached.
 
+## Arcade free play
+- Open Duck Dash, Cheese Tower, or Potato Whack and choose **Start Free Play** above the level grid.
+- Solo Free Play has no timer or score target. Each run starts with three lives; mistakes cost a life, and the run ends when they are gone.
+- The 50-level campaign remains available separately.
+
 ## Install on mobile
 - Android (Chrome): open the site menu and choose **Install app** or **Add to Home screen**.
 - iPhone/iPad (Safari): tap **Share**, then **Add to Home Screen**.

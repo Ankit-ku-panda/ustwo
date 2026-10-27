@@ -314,7 +314,7 @@ function home(){
 function levels(c){
  const cat=CATS.find(x=>x.id===c);
  if(c==="mine")return mine();
- app.innerHTML=top("home")+`<h2>${cat.ic} ${cat.t}</h2><div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr))">${[...Array(cat.n)].map((_,i)=>`<button class="card lv" data-lv="${c}:${i}" ${unlocked(c,i)?"":"disabled"}>${unlocked(c,i)?(isDone(c,i)?"✓ ":"")+(i+1):"🔒"}</button>`).join("")}</div>`;
+ app.innerHTML=top("home")+`<h2>${cat.ic} ${cat.t}</h2>${arcadeGame(c)?`<div class="panel"><h3>Solo Free Play</h3><p class="sub">Play without a timer or score target. You have three lives.</p><button class="btn" data-freeplay="${c}">Start Free Play</button></div>`:""}<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(90px,1fr))">${[...Array(cat.n)].map((_,i)=>`<button class="card lv" data-lv="${c}:${i}" ${unlocked(c,i)?"":"disabled"}>${unlocked(c,i)?(isDone(c,i)?"✓ ":"")+(i+1):"🔒"}</button>`).join("")}</div>`;
 }
 function mine(){
  app.innerHTML=top("home")+`<h2>✍️ Create a game</h2><p class="sub">Write a riddle for someone you know. It appears below as a level.</p>
@@ -402,6 +402,12 @@ function play(c,i){
   app.innerHTML=head+`<div class="panel"><p class="sub">Reach the score target to clear this level. The challenge increases each level.</p><iframe class="arcade-frame" title="${esc(arcadeGame(c).t)} — level ${i+1}" src="${esc(src.href)}" allow="autoplay; fullscreen" loading="eager"></iframe></div><div id="res"></div>`;
  }
 }
+function playFree(c){
+ const src=new URL("./arcade.html",location.href);
+ src.searchParams.set("freeplay","1");
+ src.searchParams.set("game",c);
+ app.innerHTML=top("cat:"+c)+`<h2>${arcadeGame(c).ic} ${arcadeGame(c).t} — Free Play</h2><div class="panel"><p class="sub">No timer or score target. The run ends when you use all three lives.</p><iframe class="arcade-frame" title="${esc(arcadeGame(c).t)} — Free Play" src="${esc(src.href)}" allow="autoplay; fullscreen" loading="eager"></iframe></div>`;
+}
 
 // ---------- events ----------
 window.addEventListener("message",e=>{
@@ -413,10 +419,11 @@ window.addEventListener("message",e=>{
  winBox(category,level);
 });
 document.addEventListener("click",e=>{
- const t=e.target.closest("[data-room-leave],[data-room-cat],[data-cat],[data-lv],[data-go]");if(!t||t.disabled)return;
+ const t=e.target.closest("[data-room-leave],[data-room-cat],[data-cat],[data-lv],[data-freeplay],[data-go]");if(!t||t.disabled)return;
  if(t.hasAttribute("data-room-leave"))closeRoom();
  else if(t.dataset.roomCat)beginRoomGame(t.dataset.roomCat);
  else if(t.dataset.cat)levels(t.dataset.cat);
+ else if(t.dataset.freeplay)playFree(t.dataset.freeplay);
  else if(t.dataset.lv){const[c,i]=t.dataset.lv.split(":");play(c,i)}
  else{const g=t.dataset.go;g==="home"?home():levels(g.split(":")[1])}
  window.scrollTo(0,0);

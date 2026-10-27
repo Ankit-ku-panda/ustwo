@@ -1,4 +1,4 @@
-const C='ustwo-v3',A=['./','index.html','style.css','script.js','arcade.html','arcade.css','arcade.js','manifest.webmanifest','favicon.svg','icons/icon-192.png','icons/icon-512.png'];
+const C='ustwo-v4',A=['./','index.html','style.css','script.js','arcade.html','arcade.css','arcade.js','manifest.webmanifest','favicon.svg','icons/icon-192.png','icons/icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A)));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!=C).map(x=>caches.delete(x)))).then(()=>clients.claim())));
 self.addEventListener('fetch',e=>{

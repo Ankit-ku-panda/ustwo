@@ -58,20 +58,30 @@
   var renderer = null;
   var campaignParams = new URLSearchParams(window.location.search);
   var campaign = campaignParams.get('campaign') === '1';
+  var freePlay = campaignParams.get('freeplay') === '1';
   var campaignLevel = clamp(Number(campaignParams.get('level')) || 1, 1, 50);
   var campaignGoal = Math.max(1, Number(campaignParams.get('goal')) || 1);
   var campaignDifficulty = campaign ? campaignLevel - 1 : 0;
   var campaignComplete = false;
+  var lives = 3;
 
   function popEl(el) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+  function lifeDisplay() { return new Array(lives + 1).join('\u2665') || '-'; }
   var api = {
     setScore: function (v) {
       score = v; hud.score.textContent = v; popEl(hud.score);
       if (campaign && !campaignComplete && v >= campaignGoal) completeCampaign();
     },
     setStat: function (label, v) {
-      hud.k3.textContent = campaign ? 'LEVEL' : label;
-      hud.v3.textContent = campaign ? campaignLevel + '/50' : v;
+      hud.k3.textContent = freePlay ? 'LIVES' : campaign ? 'LEVEL' : label;
+      hud.v3.textContent = freePlay ? lifeDisplay() : campaign ? campaignLevel + '/50' : v;
+    },
+    loseLife: function () {
+      if (!freePlay || mode !== 'play' || lives <= 0) return lives;
+      lives -= 1;
+      api.setStat('LIVES', lifeDisplay());
+      if (lives === 0) endGame('You used all three lives.');
+      return lives;
     },
     toast: function (text) {
       toastEl.textContent = text;
@@ -278,7 +288,8 @@
             if (o.z > 9) { scene.remove(o.mesh); obstacles.splice(i, 1); continue; }
             if (S.invuln <= 0 && Math.abs(o.z) < o.d / 2 + 0.55 && Math.abs(o.x - S.x) < o.w / 2 + 0.4 && S.y < o.h) {
               scene.remove(o.mesh); obstacles.splice(i, 1);
-              S.lives -= 1; S.invuln = 1.3; S.shake = reduce ? 0 : 0.5;
+              S.lives = freePlay ? api.loseLife() : S.lives - 1;
+              S.invuln = 1.3; S.shake = reduce ? 0 : 0.5;
               api.sfx.boom();
               api.toast(pick(['OOF!', 'QUACKTASTROPHE', 'MY HAT!', 'BONK', 'WHY']));
               api.setStat('LIVES', S.lives > 0 ? new Array(S.lives + 1).join('\u2665') : '-');
@@ -329,7 +340,7 @@
 
     var H = 0.4, AMP = 3.5, MAXW = 3;
     var blocks = [], debris = [], S = {};
-    var camY = 0;
+    var camY = 0, runScore = 0;
 
     function color(level) { return new T.Color().setHSL(((level * 17) % 360) / 360, 0.75, 0.6); }
     function addBlock(x, z, w, d, level) {
@@ -402,7 +413,8 @@
       rec.mesh.scale.set(rec.w, H, rec.d);
       rec.mesh.position.x = rec.x; rec.mesh.position.z = rec.z;
       blocks.push(rec);
-      api.setScore(blocks.length - 1);
+      runScore += 1;
+      api.setScore(freePlay ? runScore : blocks.length - 1);
       api.setStat('PERFECT', S.perf);
       spawnMoving();
     }
@@ -418,7 +430,7 @@
 
     return {
       scene: scene, camera: camera,
-      start: function () { begin(); api.setStat('PERFECT', 0); },
+      start: function () { runScore = 0; begin(); api.setStat('PERFECT', 0); },
       resize: function (a) {
         aspect = a;
         camera.left = -viewH * a / 2; camera.right = viewH * a / 2; camera.updateProjectionMatrix();
@@ -440,11 +452,15 @@
         if (S.over) {
           S.endT -= dt;
           if (S.endT <= 0 && mode === 'play') {
-            api.end(pick([
-              'The tower said NOPE and left.',
-              'That cheese was not load-bearing.',
-              'A very confident tower, until it was not.'
-            ]));
+            if (freePlay) {
+              if (api.loseLife() > 0) begin();
+            } else {
+              api.end(pick([
+                'The tower said NOPE and left.',
+                'That cheese was not load-bearing.',
+                'A very confident tower, until it was not.'
+              ]));
+            }
           }
         }
         updateCamera();
@@ -474,8 +490,8 @@
     function hide(h) { h.up = false; h.type = null; h.el.classList.remove('up', 'hit'); }
     function reset() {
       holes.forEach(hide);
-      S = { time: 30, spawnT: 0.5, n: 0, running: true };
-      api.setStat('TIME', 30);
+      S = { time: 30, elapsed: 0, spawnT: 0.5, n: 0, running: true };
+      api.setStat(freePlay ? 'LIVES' : 'TIME', freePlay ? lifeDisplay() : 30);
     }
     function whack(h) {
       if (!api.playing() || !h.up) return;
@@ -489,6 +505,7 @@
         S.n += 1; api.setScore(score + 5); api.sfx.coin(); api.toast('GOLDEN SPUD +5');
       } else {
         api.setScore(Math.max(0, score - 3)); api.sfx.bad(); api.toast(pick(['NOT THE DUCK!', 'THE DUCK HAS RIGHTS', 'WHY WOULD YOU']));
+        if (freePlay) api.loseLife();
       }
     }
     function spawn() {
@@ -497,8 +514,8 @@
       var h = pick(free), r = Math.random();
       h.type = r < 0.74 ? 'potato' : r < 0.84 ? 'gold' : 'duck';
       h.pop.textContent = h.type === 'potato' ? '\uD83E\uDD54' : h.type === 'gold' ? '\uD83C\uDF60' : '\uD83E\uDD86';
-      var elapsed = 30 - S.time;
-      h.t = Math.max(0.35, rand(0.85, 1.4) - elapsed * 0.012 - Math.min(0.25, campaignDifficulty * 0.005));
+      var elapsed = S.elapsed;
+      h.t = freePlay ? rand(0.95, 1.4) : Math.max(0.35, rand(0.85, 1.4) - elapsed * 0.012 - Math.min(0.25, campaignDifficulty * 0.005));
       h.up = true; h.el.classList.remove('hit'); h.el.classList.add('up');
     }
     reset();
@@ -510,15 +527,25 @@
       pointer: function () {},
       update: function (dt, playing) {
         if (!playing) return;
-        S.time -= dt;
-        api.setStat('TIME', Math.max(0, Math.ceil(S.time)));
+        S.elapsed += dt;
+        if (!freePlay) {
+          S.time -= dt;
+          api.setStat('TIME', Math.max(0, Math.ceil(S.time)));
+        }
         S.spawnT -= dt;
         if (S.spawnT <= 0) {
           spawn();
-          S.spawnT = Math.max(0.2, 0.8 - (30 - S.time) * 0.016 - Math.min(0.25, campaignDifficulty * 0.005));
+          S.spawnT = freePlay ? 0.8 : Math.max(0.2, 0.8 - S.elapsed * 0.016 - Math.min(0.25, campaignDifficulty * 0.005));
         }
-        holes.forEach(function (h) { if (h.up) { h.t -= dt; if (h.t <= 0) hide(h); } });
-        if (S.time <= 0) api.end(S.n >= 25 ? 'Potato destroyer. The farm will remember.' : S.n >= 12 ? 'Decent whacking. The potatoes are scared.' : 'The potatoes won today.');
+        holes.forEach(function (h) {
+          if (!h.up) return;
+          h.t -= dt;
+          if (h.t <= 0) {
+            if (freePlay && h.type !== 'duck') api.loseLife();
+            hide(h);
+          }
+        });
+        if (!freePlay && S.time <= 0) api.end(S.n >= 25 ? 'Potato destroyer. The farm will remember.' : S.n >= 12 ? 'Decent whacking. The potatoes are scared.' : 'The potatoes won today.');
       },
       dispose: function () { holesEl.innerHTML = ''; }
     };
@@ -590,6 +617,10 @@
       hud.best.previousElementSibling.textContent = 'TARGET';
       hud.k3.textContent = 'LEVEL';
       hud.v3.textContent = campaignLevel + '/50';
+    } else if (freePlay) {
+      hud.best.previousElementSibling.textContent = 'BEST';
+      hud.k3.textContent = 'LIVES';
+      hud.v3.textContent = lifeDisplay();
     } else {
       hud.best.textContent = getBest(id);
     }
@@ -604,13 +635,17 @@
     if (campaign) {
       hud.k3.textContent = 'LEVEL';
       hud.v3.textContent = campaignLevel + '/50';
+    } else if (freePlay) {
+      hud.k3.textContent = 'LIVES';
+      hud.v3.textContent = lifeDisplay();
     }
     fit();
-    showOverlay(curDef.title, curDef.text, 'Start', curDef.keys);
+    showOverlay(curDef.title, freePlay ? curDef.text.replace('You have 30 seconds.', 'Play as long as you like.') + ' Free play: no timer or score target, with three lives.' : curDef.text, 'Start', curDef.keys);
   }
 
   function startGame() {
     if (!cur) return;
+    lives = 3;
     score = 0; hud.score.textContent = '0';
     cur.start();
     mode = 'play';
@@ -682,6 +717,6 @@
     requestAnimationFrame(frame);
   }
 
-  select(campaign && DEFS[campaignParams.get('game')] ? campaignParams.get('game') : 'duck');
+  select((campaign || freePlay) && DEFS[campaignParams.get('game')] ? campaignParams.get('game') : 'duck');
   requestAnimationFrame(frame);
 })();
