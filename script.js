@@ -4,7 +4,7 @@ let S={name:"",done:{},custom:[]};
 try{Object.assign(S,JSON.parse(localStorage.getItem("ustwo")||"{}"))}catch(e){}
 const save=()=>{try{localStorage.setItem("ustwo",JSON.stringify(S))}catch(e){}};
 const $=s=>document.querySelector(s), app=$("#app");
-let room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[],joinAttempts:0,retryTimer:null,joinTimer:null};
+let room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[],joinAttempts:0,retryTimer:null,joinTimer:null,hostAttempts:0};
 
 // ---------- levels (edit these to add more) ----------
 const RIDDLES=[
@@ -15,16 +15,64 @@ const RIDDLES=[
 ["I speak without a mouth and hear without ears. What am I?","echo","Shout in a canyon."],
 ["What has a heart that does not beat?","artichoke","A vegetable."],
 ["What can travel the world while staying in a corner?","stamp","Goes on envelopes."],
-["What runs but never walks?","river","It has a mouth and a bed."]];
-const WORDS=["react","pixel","shader","canvas","vector","texture","camera","render","gradient","polygon"];
-const MEM=[["🍎","🍌","🍇","🍓"],["🚀","🌙","⭐","🪐","☄️","🌍"],["🐱","🐶","🦊","🐼","🐸","🦁","🐙","🦄"],["🍕","🍔","🍟","🌮","🍩","🍦","🍣","🥐"]];
-const ZIP=[3,4,5,6,7];
+["What runs but never walks?","river","It has a mouth and a bed."],
+["What has one eye but cannot see?","needle","It is used for sewing."],
+["What has many teeth but cannot bite?","comb","It helps tidy hair."],
+["What has a neck but no head?","bottle","It can hold a drink."],
+["What has cities but no houses, forests but no trees, and rivers but no water?","map","You might fold it before a trip."],
+["What goes up but never comes down?","age","It increases each birthday."],
+["What belongs to you but other people use it more?","name","People say it to get your attention."],
+["What can you catch but not throw?","cold","It often comes with a cough."],
+["What has four fingers and a thumb but is not alive?","glove","You wear it on your hand."],
+["What has a head and a tail but no body?","coin","You flip it to choose."],
+["What gets bigger the more you take away?","hole","Digging makes it grow."],
+["What can fill a room but takes up no space?","light","A lamp can switch it on."],
+["What has words but never speaks?","book","You turn its pages."],
+["What has legs but never walks?","table","You might eat dinner at it."],
+["What has branches but no fruit, trunk, or leaves?","bank","It keeps money safe."],
+["What has a ring but no finger?","telephone","It rings when someone calls."],
+["What has a bottom at the top?","leg","It is part of your body."],
+["What can be cracked, made, told, and played?","joke","A punchline often follows it."],
+["What has 13 hearts but no other organs?","cards","It is a deck used for games."],
+["What kind of band never plays music?","rubber","It stretches around things."],
+["What has an end but no beginning, a home but no family, and a space without a room?","keyboard","Look at the keys you type with."],
+["What word is spelled incorrectly in every dictionary?","incorrectly","Read the question carefully."],
+["What five-letter word becomes shorter when you add two letters?","short","Add the letters e and r."],
+["What starts with E, ends with E, and contains one letter?","envelope","It carries a letter inside."],
+["What has a spine but no bones and pages but no voice?","notebook","You can write notes in it."],
+["What can be opened but has no hinges, lock, or lid?","mind","An idea can change it."],
+["What has a tongue but cannot taste and sole but cannot walk?","shoe","It goes on your foot."],
+["What has roots nobody sees, is taller than trees, and keeps growing upward?","mountain","Its peak can be snowy."],
+["What has an eye at its center but cannot see, and spins without moving?","hurricane","It is a powerful storm."],
+["What breaks the moment you say its name?","silence","A quiet room has it."],
+["What can be measured but has no length, width, or height?","time","Clocks keep track of it."],
+["What has a face and two hands but no arms or legs?","watch","It tells you the time."],
+["What has a bed but never sleeps, a bank but no money, and a mouth but never eats?","river","It flows toward the sea."],
+["What has keys that open no locks and space but no room, and lets you enter without walking?","keyboard","It is used with a computer."],
+["What can be served but never eaten, returned but never borrowed, and is called during a match?","tennis","Players hit a ball over a net."],
+["What is always in front of you but cannot be seen?","future","It has not happened yet."],
+["What has no life but can die, has no lungs but needs air, and water ends it?","fire","It gives off heat and light."],
+["What can travel from person to person without moving, and disappears when shared?","secret","You whisper it to someone you trust."],
+["What has a number on every face but no eyes, and decides a board-game move?","dice","You roll a pair of them."],
+["What is bought by the yard and worn by the foot?","carpet","It covers the floor."],
+["What has a lock but no key, a space but no room, and stores files?","computer","It sits on a desk or lap."],
+["What can point in every direction but never move from its place?","compass","Its needle points north."],
+["What has a web but no spider, links but no chain, and pages all around the world?","internet","You browse it online."]];
+const WORDS=["react","pixel","vector","shader","canvas","render","camera","matrix","buffer","vertex","texture","browser","compile","element","function","promise","closure","decimal","polygon","gradient","internet","keyboard","variable","constant","database","terminal","protocol","argument","recursion","algorithm","iteration","parameter","framework","interface","typescript","javascript","stylesheet","middleware","repository","responsive","accessible","concurrency","architecture","authentication","configuration","virtualization","implementation","representation","internationalization","interoperability"];
+const MEM_ICONS=["🍎","🍌","🍇","🍓","🚀","🌙","⭐","🪐","☄️","🌍","🐱","🐶","🦊","🐼","🐸","🦁","🐙","🦄","🍕","🍔","🍟","🌮","🍩","🍦","🍣"];
+const LEVEL_COUNT=50;
+const ARCADE_GAMES=[
+ {id:"duck",ic:"🦆",t:"Duck Dash",d:"Dodge, jump, and collect donuts",score:"distance and donuts"},
+ {id:"stack",ic:"🧀",t:"Cheese Tower",d:"Stack moving slabs without toppling",score:"stacked cheese slabs"},
+ {id:"whack",ic:"🥔",t:"Potato Whack",d:"Whack potatoes before time runs out",score:"potatoes whacked"}
+];
 const CATS=[
-{id:"riddle",ic:"🧩",t:"Riddles",d:"Brain teasers with hints",n:RIDDLES.length},
-{id:"scr",ic:"🔤",t:"Word Scramble",d:"Unscramble tech words",n:WORDS.length},
-{id:"mem",ic:"🃏",t:"Memory Match",d:"Flip cards in 3D",n:MEM.length},
-{id:"zip",ic:"🧵",t:"Zip Path",d:"Draw one line through every cell",n:ZIP.length},
+{id:"riddle",ic:"🧩",t:"Riddles",d:"Brain teasers with hints",n:LEVEL_COUNT},
+{id:"scr",ic:"🔤",t:"Word Scramble",d:"Unscramble tech words",n:LEVEL_COUNT},
+{id:"mem",ic:"🃏",t:"Memory Match",d:"Flip cards in 3D",n:LEVEL_COUNT},
+{id:"zip",ic:"🧵",t:"Zip Path",d:"Draw one line through every cell",n:LEVEL_COUNT},
 {id:"mine",ic:"✍️",t:"Create a game",d:"Write your own riddles",n:0}];
+CATS.push(...ARCADE_GAMES.map(g=>({...g,n:LEVEL_COUNT})));
 
 // ---------- helpers ----------
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -33,6 +81,13 @@ const stars=()=>Object.keys(S.done).length;
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
 const isDone=(c,i)=>!!S.done[c+":"+i];
 const unlocked=(c,i)=>i===0||isDone(c,i-1);
+const arcadeGame=id=>ARCADE_GAMES.find(g=>g.id===id);
+const levelCount=c=>c==="mine"?S.custom.length:LEVEL_COUNT;
+const arcadeGoal=(c,i)=>c==="duck"?20+(i+1)*2:c==="stack"?3+Math.ceil((i+1)*.3):5+Math.ceil((i+1)*.45);
+const memoryPairs=i=>Math.min(MEM_ICONS.length,4+Math.floor(i*(MEM_ICONS.length-4)/(LEVEL_COUNT-1)));
+const zipSize=i=>Math.min(10,3+Math.floor(i/7));
+const zipMarkers=(i,n)=>Math.min(n*n,4+Math.floor(i/4));
+const generateRoomCode=()=>String(Math.floor(1000+Math.random()*9000));
 function top(back){return `<div class="bar"><div>${room.active?`<button class="btn g" data-room-leave>Leave room</button>`:back?`<button class="btn g" data-go="${back}">← Back</button>`:""}</div><div><span class="pill">👤 ${esc(S.name)}</span> <span class="pill" id="star-count">⭐ ${stars()}</span></div></div>`}
 function roomPlayerStatus(){return room.active?`<p class="sub" id="room-progress">Playing with ${esc(room.partnerName||"your partner")} · both players must solve this level to continue.</p>`:""}
 
@@ -47,7 +102,7 @@ function closeRoom(){
  clearTimeout(room.retryTimer);clearTimeout(room.joinTimer);
  if(room.conn)room.conn.close();
  if(room.peer)room.peer.destroy();
- room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[],joinAttempts:0,retryTimer:null,joinTimer:null};
+ room={peer:null,conn:null,role:"",code:"",partnerName:"",category:"",level:0,active:false,selfDone:false,partnerDone:false,custom:[],joinAttempts:0,retryTimer:null,joinTimer:null,hostAttempts:0};
  home();
 }
 function roomLobby(){
@@ -56,7 +111,7 @@ function roomLobby(){
   ${room.role==="host"&&room.code?`<button class="btn" id="share-room">Share invite</button><button class="btn g" id="copy-room-code">Copy code</button>`:""}
   <p id="room-status" class="msg">${room.role==="host"?"Waiting for your partner to join. Keep this page open while they connect.":"Connecting…"}</p>
   ${room.role==="host"?`<div class="grid">${CATS.map(c=>`<button class="card" data-room-cat="${c.id}" ${c.id==="mine"&&!S.custom.length?"disabled":""}><span class="ic">${c.ic}</span><b>${c.t}</b><small>${c.id==="mine"&&!S.custom.length?"Add your own riddles first":c.d+(c.n?" · "+c.n+" levels":"")}</small></button>`).join("")}</div>`:""}
-  ${room.role==="guest"?`<label for="room-code-input">Room code</label><br><input id="room-code-input" value="${esc(room.code)}" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn" id="retry-join">Join room</button>`:""}
+  ${room.role==="guest"?`<label for="room-code-input">Room code</label><br><input id="room-code-input" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" value="${esc(room.code)}" autocomplete="off" autocapitalize="off" spellcheck="false"><button class="btn" id="retry-join">Join room</button>`:""}
   <div id="room-error" class="msg" role="alert"></div><button class="btn g" id="leave-room">Leave room</button>
  </div>`;
  $("#leave-room").onclick=closeRoom;
@@ -90,12 +145,21 @@ function roomFailure(message){
 }
 function startRoomHost(){
  if(typeof Peer==="undefined"){roomError("Room connection is unavailable. Check your internet connection and reload.");return}
- room.role="host";room.partnerName="";
+ if(room.peer)room.peer.destroy();
+ room.role="host";room.partnerName="";room.hostAttempts=0;
+ roomLobby();
+ createHostPeer();
+}
+function createHostPeer(){
+ if(room.hostAttempts>=12){roomFailure("Could not reserve a four-digit room code. Try creating a room again.");return}
+ room.hostAttempts++;
+ room.code=generateRoomCode();
  roomLobby();
  try{
-  room.peer=new Peer();
-  room.peer.on("open",id=>{room.code=id;roomLobby()});
-  room.peer.on("connection",conn=>{
+  const peer=new Peer(room.code);
+  room.peer=peer;
+  peer.on("open",()=>roomLobby());
+  peer.on("connection",conn=>{
    if(room.conn){conn.close();return}
    room.conn=conn;
    conn.on("open",()=>{
@@ -105,18 +169,24 @@ function startRoomHost(){
    conn.on("close",()=>{room.partnerName="";room.partnerDone=false;if(room.active){room.active=false;if(room.peer)room.peer.destroy();room.peer=null;room.conn=null;home();roomError("Your partner disconnected. Create a new room to play together.")}else{room.conn=null;roomStatus("Partner disconnected. Share the same room code and have them join again.")}});
    conn.on("error",()=>roomFailure("The room connection was interrupted. Please create a new room."));
   });
-  room.peer.on("error",err=>roomFailure(err.type==="unavailable-id"?"That room code is already in use. Create a new room.":"Could not connect to the room service. Check your internet connection and try again."));
- }catch(error){roomFailure("Could not create a room. Check your internet connection and try again.");}
+  peer.on("error",err=>{
+   if(peer!==room.peer)return;
+   if(err.type==="unavailable-id"){
+    peer.destroy();room.peer=null;createHostPeer();
+   }else roomFailure("Could not create a room. Check your internet connection and try again.");
+  });
+ }catch(error){room.peer=null;createHostPeer();}
 }
 function startRoomGuest(code){
  code=String(code||"").trim().replace(/\s+/g,"");
  if(!code){roomError("Enter the room code first.");return}
+ if(!/^\d{4}$/.test(code)){roomError("Room codes must be exactly four digits.");return}
  if(typeof Peer==="undefined"){roomError("Room connection is unavailable. Check your internet connection and reload.");return}
  clearTimeout(room.retryTimer);clearTimeout(room.joinTimer);
  room.joinAttempts++;
  if(room.conn)room.conn.close();
  if(room.peer)room.peer.destroy();
- room.role="guest";room.code=code;room.partnerName="";room.conn=null;room.peer=null;room.joinAttempts=0;roomLobby();
+ room.role="guest";room.code=code;room.partnerName="";room.conn=null;room.peer=null;room.joinAttempts=0;room.hostAttempts=0;roomLobby();
  try{
   room.peer=new Peer();
   room.peer.on("open",()=>connectToRoom(code));
@@ -200,10 +270,10 @@ function completeRoomLevel(category,level){
  if(room.selfDone)return;
  room.selfDone=true;
  if(room.role==="guest"&&room.conn&&room.conn.open)room.conn.send({type:"complete",category,level});
- if(room.role==="host")checkRoomCompletion();
- else $("#res").innerHTML=`<div class="panel"><h2>You solved it!</h2><p class="msg">Waiting for ${esc(room.partnerName||"your partner")} to finish this level…</p></div>`;
+ if(room.role==="guest")$("#res").innerHTML=`<div class="panel"><h2>You solved it!</h2><p class="msg">Waiting for ${esc(room.partnerName||"your partner")} to finish this level…</p></div>`;
  const progress=$("#room-progress");
  if(progress)progress.textContent=room.role==="host"?"You solved it. Waiting for your partner…":"You solved it. Waiting for your partner…";
+ if(room.role==="host")checkRoomCompletion();
 }
 function checkRoomCompletion(){
  if(room.role!=="host"||!room.active||!room.selfDone||!room.partnerDone)return;
@@ -232,7 +302,7 @@ function home(){
   $("#name-form").onsubmit=e=>{e.preventDefault();const v=$("#nm").value.trim();if(v.length<2){$("#m").textContent="Use at least 2 characters.";$("#nm").focus();return}S.name=v;save();home()};return}
  app.innerHTML=top()+`<h1>${split("Hey "+S.name)}</h1><p class="sub">Choose a game category or play together.</p>
  <div class="panel"><h2>Play together</h2><button class="btn" id="create-room">Create room</button>
- <input id="join-code" value="${esc(new URL(location.href).searchParams.get("join")||"")}" placeholder="Enter your partner's room code" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="join"><button class="btn g" id="join-room">Join room</button><div class="msg" id="room-error" role="alert"></div></div>
+ <input id="join-code" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" value="${esc(new URL(location.href).searchParams.get("join")||"")}" placeholder="Enter your partner's 4-digit room code" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="join"><button class="btn g" id="join-room">Join room</button><div class="msg" id="room-error" role="alert"></div></div>
  <h2>Play solo</h2>
  <div class="grid">${CATS.map(c=>`<button class="card" data-cat="${c.id}"><span class="ic">${c.ic}</span><b>${c.t}</b><small>${c.d}${c.n?" · "+c.n+" levels":""}</small></button>`).join("")}</div>
  <p><button class="btn g" id="rn">Change username</button></p>`;
@@ -275,16 +345,17 @@ function play(c,i){
   $("#answer-form").onsubmit=ck;$("#ht").onclick=()=>$("#m").textContent="Starts with "+w[0].toUpperCase()+", ends with "+w.slice(-1).toUpperCase();
  }
  if(c==="mem"){
-  const deck=shuffle([...MEM[i],...MEM[i]]);let open=[],lock=false,found=0,moves=0;
+  const pairs=memoryPairs(i),icons=shuffle(MEM_ICONS).slice(0,pairs);
+  const deck=shuffle([...icons,...icons]);let open=[],lock=false,found=0,moves=0;
   app.innerHTML=head+`<div class="panel"><div class="msg" id="m">Moves: 0</div><div class="mem">${deck.map((e,k)=>`<button class="mc" data-k="${k}"><span class="fr">?</span><span class="bk">${e}</span></button>`).join("")}</div></div><div id="res"></div>`;
   document.querySelectorAll(".mc").forEach(b=>b.onclick=()=>{
    if(lock||b.classList.contains("f"))return;b.classList.add("f");open.push(b);
    if(open.length===2){moves++;$("#m").textContent="Moves: "+moves;const[x,y]=open;
-    if(deck[x.dataset.k]===deck[y.dataset.k]){x.classList.add("d");y.classList.add("d");open=[];if(++found===MEM[i].length)winBox(c,i)}
+    if(deck[x.dataset.k]===deck[y.dataset.k]){x.classList.add("d");y.classList.add("d");open=[];if(++found===pairs)winBox(c,i)}
     else{lock=true;setTimeout(()=>{x.classList.remove("f");y.classList.remove("f");open=[];lock=false},800)}}});
  }
  if(c==="zip"){
-  const n=ZIP[i],k=n+1,tr=Math.random()<.5,fx=Math.random()<.5,fy=Math.random()<.5;
+  const n=zipSize(i),k=zipMarkers(i,n),tr=Math.random()<.5,fx=Math.random()<.5,fy=Math.random()<.5;
   const num={};const cell=t=>{const r=t/n|0;let cc=r%2?n-1-t%n:t%n,rr=r;if(fx)cc=n-1-cc;if(fy)rr=n-1-rr;return tr?cc*n+rr:rr*n+cc};
   for(let j=0;j<k;j++)num[cell(Math.round(j*(n*n-1)/(k-1)))]=j+1;
   let path=[],pointerId=null,lastPointerCell=-1;
@@ -322,9 +393,25 @@ function play(c,i){
   zip.addEventListener("pointerup",endPointer);
   zip.addEventListener("pointercancel",endPointer);
  }
+ if(arcadeGame(c)){
+  const goal=arcadeGoal(c,i),src=new URL("./arcade.html",location.href);
+  src.searchParams.set("campaign","1");
+  src.searchParams.set("game",c);
+  src.searchParams.set("level",String(i+1));
+  src.searchParams.set("goal",String(goal));
+  app.innerHTML=head+`<div class="panel"><p class="sub">Reach the score target to clear this level. The challenge increases each level.</p><iframe class="arcade-frame" title="${esc(arcadeGame(c).t)} — level ${i+1}" src="${esc(src.href)}" allow="autoplay; fullscreen" loading="eager"></iframe></div><div id="res"></div>`;
+ }
 }
 
 // ---------- events ----------
+window.addEventListener("message",e=>{
+ if(e.origin!==location.origin||!room.active&& !$("#app .arcade-frame")||e.source!==$("#app .arcade-frame")?.contentWindow)return;
+ const message=e.data;
+ if(!message||message.type!=="arcade-level-complete"||!arcadeGame(message.game)||!Number.isInteger(message.level)||!Number.isFinite(message.score))return;
+ const frame=$("#app .arcade-frame"),category=room.active?room.category:frame&&new URL(frame.src).searchParams.get("game"),level=room.active?room.level:Number(frame&&new URL(frame.src).searchParams.get("level"))-1;
+ if(message.game!==category||message.level!==level+1||message.score<arcadeGoal(category,level))return;
+ winBox(category,level);
+});
 document.addEventListener("click",e=>{
  const t=e.target.closest("[data-room-leave],[data-room-cat],[data-cat],[data-lv],[data-go]");if(!t||t.disabled)return;
  if(t.hasAttribute("data-room-leave"))closeRoom();

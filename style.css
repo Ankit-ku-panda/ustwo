@@ -24,6 +24,7 @@ input:focus{border-color:var(--a)}
 .pill{padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--bd);font-size:.9rem}
 .lv{aspect-ratio:1;display:grid;place-items:center;font-size:1.3rem;font-weight:700}
 .panel{margin-top:18px;padding:20px;border-radius:20px;background:var(--card);border:1px solid var(--bd);backdrop-filter:blur(10px)}
+.arcade-frame{display:block;width:100%;height:min(820px,85vh);min-height:640px;border:0;border-radius:16px;background:#12062e}
 .msg{min-height:1.4em;color:var(--mut);margin:10px 0}
 .zip{display:grid;gap:6px;width:min(100%,420px);margin:14px auto;touch-action:none;user-select:none;-webkit-user-select:none}
 .zc{aspect-ratio:1;min-width:0;min-height:36px;border-radius:12px;border:1px solid var(--bd);display:grid;place-items:center;font-weight:800;font-size:clamp(.85rem,4vw,1.2rem);cursor:pointer;background:var(--card);color:var(--fg);font-family:inherit;padding:0;transition:background-color .15s,transform .15s;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
